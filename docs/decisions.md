@@ -74,6 +74,7 @@ Force the mixed-type columns to numeric values and treat anything else as missin
 ### Tradeoff
 The fields will require more investigation before they can be used for analysis.
 
+
 ## 2026-08-18 - validate the data before cleaning it
 
 ### Decision
@@ -87,6 +88,7 @@ Start cleaning the dataset immediately based on the initial inspection.
 
 ### Tradeoff
 This adds another step before building the application, but it should prevent me from removing or changing valid data without understanding it first.
+
 
 ## 2026-08-18 - treat JASC codes as strings
 
@@ -102,7 +104,7 @@ Allow pandas to automatically infer JASC codes as numbers.
 ### Tradeoff
 Any numerical operations would require conversion later, but I do not currently expect numerical calculations on the codes themselves.
 
-<<<<<<< Updated upstream
+
 ## 2026-08-18 - use OperatorControlNumber as the report identifier
 
 ### Decision
@@ -133,10 +135,10 @@ Drop any record that does not have both aircraft make and aircraft model.
 Some dashboard filters will need to handle missing aircraft information, but useful maintenance reports will not be unnecessarily removed.
 
 
-## 2026-08-18 - convert DifficultyDate during cleaning
+## 2026-08-18 - parse DifficultyDate during cleaning
 
 ### Decision
-Convert `DifficultyDate` into a proper date type in the cleaned dataset.
+Parse `DifficultyDate` as a proper date during the cleaning process.
 
 ### Reason
 All 67,620 dates were successfully parsed using the expected month/day/year format and the date range matches the 2025 dataset.
@@ -145,7 +147,22 @@ All 67,620 dates were successfully parsed using the expected month/day/year form
 Keep the dates as strings.
 
 ### Tradeoff
-Converting the field means the cleaning pipeline needs to enforce a specific date format, but it will make filtering and time-based analysis much easier.
+The cleaning pipeline needs to enforce a specific date format, but parsing the field will make filtering and time-based analysis much easier later.
+
+
+## 2026-08-18 - standardize submission timestamps to UTC
+
+### Decision
+Parse `SubmissionDate` as a datetime and standardize the timestamps to UTC during cleaning.
+
+### Reason
+The FAA submission timestamps include timezone information. Converting them to one consistent timezone should make sorting and comparing submission times easier later.
+
+### Alternative considered
+Keep the original timestamp strings exactly as they appear in the CSV.
+
+### Tradeoff
+The processed timestamp will no longer display the original timezone offset, but the actual point in time is preserved in a consistent format.
 
 
 ## 2026-08-18 - keep discrepancy text for machine learning and analysis
@@ -161,20 +178,7 @@ Only keep structured fields such as JASC code and part name.
 
 ### Tradeoff
 Keeping free text increases storage and requires additional preprocessing for machine learning, but it preserves one of the most informative fields in the dataset.
-=======
-## 2026-08-18 - keep the README based on completed work
 
-### Decision
-Only describe features in the README that are already implemented, and list unfinished features as planned work.
-
-### Reason
-I want the repository documentation to match the actual state of the project instead of making the project sound more complete than it is.
-
-### Alternative considered
-Describe the planned final system as if all of the features were already part of AeroMaintain.
-
-### Tradeoff
-The README will look simpler while the project is still early, but it will be more accurate and easier to update as features are completed.
 
 ## 2026-08-18 - keep cleaning conservative
 
@@ -234,4 +238,3 @@ Remove incomplete reports during cleaning.
 
 ### Tradeoff
 Some records will not work with every dashboard filter, but they can still contribute to other analyses.
->>>>>>> Stashed changes

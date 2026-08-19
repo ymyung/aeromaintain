@@ -1,6 +1,5 @@
 import pandas as pd
 
-
 # load the 2025 faa maintenance data
 df = pd.read_csv("data/raw/SDR-2025.csv")
 
@@ -56,11 +55,7 @@ for column in important_columns:
     missing = df[column].isna().sum()
     unique = df[column].nunique(dropna=True)
 
-    print(
-        f"{column}: "
-        f"{missing} missing, "
-        f"{unique} unique values"
-    )
+    print(f"{column}: {missing} missing, {unique} unique values")
 
 
 # see which aircraft manufacturers appear most often
