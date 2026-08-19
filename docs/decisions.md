@@ -102,6 +102,7 @@ Allow pandas to automatically infer JASC codes as numbers.
 ### Tradeoff
 Any numerical operations would require conversion later, but I do not currently expect numerical calculations on the codes themselves.
 
+<<<<<<< Updated upstream
 ## 2026-08-18 - use OperatorControlNumber as the report identifier
 
 ### Decision
@@ -160,3 +161,77 @@ Only keep structured fields such as JASC code and part name.
 
 ### Tradeoff
 Keeping free text increases storage and requires additional preprocessing for machine learning, but it preserves one of the most informative fields in the dataset.
+=======
+## 2026-08-18 - keep the README based on completed work
+
+### Decision
+Only describe features in the README that are already implemented, and list unfinished features as planned work.
+
+### Reason
+I want the repository documentation to match the actual state of the project instead of making the project sound more complete than it is.
+
+### Alternative considered
+Describe the planned final system as if all of the features were already part of AeroMaintain.
+
+### Tradeoff
+The README will look simpler while the project is still early, but it will be more accurate and easier to update as features are completed.
+
+## 2026-08-18 - keep cleaning conservative
+
+### Decision
+Only apply cleaning rules that are supported by the data inspection and validation results.
+
+### Reason
+The FAA data is already fairly structured and some unusual values may still be valid aircraft or maintenance identifiers. I do not want to change values just to make the dataset look cleaner.
+
+### Alternative considered
+Apply broader cleaning such as removing incomplete rows, combining aircraft models, or replacing unusual values automatically.
+
+### Tradeoff
+Some inconsistencies may remain in the first version, but there is less risk of changing valid source information.
+
+
+## 2026-08-18 - reduce the processed dataset to useful fields
+
+### Decision
+Create the first processed dataset using 18 fields from the original 76.
+
+### Reason
+Many FAA SDR fields are extremely sparse or are not currently needed by the application. Keeping a smaller application-focused dataset makes later database and analytics work simpler while the original CSV remains available if another field is needed.
+
+### Alternative considered
+Import all 76 fields into the application database.
+
+### Tradeoff
+A field that becomes useful later may need to be added back into the cleaning pipeline, but this avoids carrying a large number of unused fields through the first version.
+
+
+## 2026-08-18 - preserve original discrepancy wording
+
+### Decision
+Only remove leading and trailing whitespace from `Discrepancy` and otherwise preserve the original maintenance description.
+
+### Reason
+The discrepancy field contains the original maintenance narrative and may later be used for machine learning. Any model-specific preprocessing should happen separately rather than changing the cleaned source text.
+
+### Alternative considered
+Convert all discrepancy text to lowercase or perform text cleaning during the main data-cleaning step.
+
+### Tradeoff
+The stored text may contain inconsistent capitalization and formatting, but the original information is preserved.
+
+
+## 2026-08-18 - preserve row count during initial cleaning
+
+### Decision
+The initial cleaning pipeline should keep all 67,620 validated maintenance reports.
+
+### Reason
+Validation did not find duplicate reports or invalid core records, and missing aircraft make/model values do not make the rest of a report unusable.
+
+### Alternative considered
+Remove incomplete reports during cleaning.
+
+### Tradeoff
+Some records will not work with every dashboard filter, but they can still contribute to other analyses.
+>>>>>>> Stashed changes
