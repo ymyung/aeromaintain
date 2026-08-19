@@ -15,6 +15,7 @@ Completed so far:
 - documented missing data and data quality issues
 - built an initial cleaning pipeline
 - preserved the original raw dataset separately from processed data
+- added automated tests for the cleaning pipeline
 
 ## Dataset
 
@@ -49,4 +50,5 @@ aeromaintain/
 │   ├── validate_data.py
 │   └── clean_data.py
 ├── tests/
+└── test_clean_data.py
 └── README.md

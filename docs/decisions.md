@@ -238,3 +238,47 @@ Remove incomplete reports during cleaning.
 
 ### Tradeoff
 Some records will not work with every dashboard filter, but they can still contribute to other analyses.
+
+## 2026-08-19 - separate cleaning logic from file input/output
+
+### Decision
+Move the main cleaning rules into a `clean_data()` function and keep file loading and saving inside `main()`.
+
+### Reason
+This makes the cleaning logic easier to test without having to read and write the full FAA dataset every time a test runs.
+
+### Alternative considered
+Keep all cleaning code running directly when `clean_data.py` is executed.
+
+### Tradeoff
+The file has a little more structure, but the cleaning logic can now be reused and tested independently.
+
+
+## 2026-08-19 - use small synthetic datasets for cleaning tests
+
+### Decision
+Use a small manually created DataFrame for unit tests instead of running every test against the full FAA dataset.
+
+### Reason
+The purpose of these tests is to verify individual cleaning rules. A small dataset makes the tests faster and lets me deliberately include cases such as extra whitespace, missing aircraft information, and duplicate report IDs.
+
+### Alternative considered
+Run every automated test using all 67,620 FAA reports.
+
+### Tradeoff
+The unit tests do not prove that every real FAA record behaves correctly, so the full pipeline will still be run separately as an integration check.
+
+
+## 2026-08-19 - test cleaning invariants automatically
+
+### Decision
+Add automated tests for behavior that should remain true whenever the cleaning pipeline changes.
+
+### Reason
+Important assumptions such as preserving row count, keeping report IDs unique, parsing dates, and preserving discrepancy text should not depend only on manually reading terminal output.
+
+### Alternative considered
+Continue checking the cleaning results manually after every change.
+
+### Tradeoff
+Tests require some additional code to maintain, but they should make later changes safer and easier to debug.

@@ -1,19 +1,13 @@
+from pathlib import Path
+
 import pandas as pd
 
 # file locations
-raw_file = "data/raw/SDR-2025.csv"
-output_file = "data/processed/sdr_2025_clean.csv"
+raw_file = Path("data/raw/SDR-2025.csv")
+output_file = Path("data/processed/sdr_2025_clean.csv")
 
 
-# load the original faa data
-df = pd.read_csv(
-    raw_file,
-    dtype={"JASCCode": "string"},
-    low_memory=False,
-)
-
-
-# fields that are useful for the first version of aeromaintain
+# fields used by the first version of aeromaintain
 columns_to_keep = [
     "OperatorControlNumber",
     "DifficultyDate",
@@ -36,28 +30,7 @@ columns_to_keep = [
 ]
 
 
-# make a separate dataframe so the raw data is left alone
-clean_df = df[columns_to_keep].copy()
-
-
-# convert the difficulty date into an actual date
-clean_df["DifficultyDate"] = pd.to_datetime(
-    clean_df["DifficultyDate"],
-    format="%m/%d/%Y",
-    errors="coerce",
-)
-
-
-# convert submission timestamps to datetime
-# utc=True handles the timezone information included in the faa data
-clean_df["SubmissionDate"] = pd.to_datetime(
-    clean_df["SubmissionDate"],
-    errors="coerce",
-    utc=True,
-)
-
-
-# text fields where extra spaces would not have any useful meaning
+# fields where leading/trailing spaces should be removed
 text_columns = [
     "OperatorControlNumber",
     "JASCCode",
@@ -75,18 +48,7 @@ text_columns = [
 ]
 
 
-# remove spaces at the beginning and end of text values
-for column in text_columns:
-    clean_df[column] = clean_df[column].str.strip()
-
-
-# turn empty strings into proper missing values
-for column in text_columns:
-    clean_df[column] = clean_df[column].replace("", pd.NA)
-
-
-# keep category fields consistent
-# these values are identifiers/categories rather than normal sentences
+# categorical fields that should use consistent capitalization
 uppercase_columns = [
     "JASCCode",
     "AircraftMake",
@@ -98,54 +60,86 @@ uppercase_columns = [
 ]
 
 
-for column in uppercase_columns:
-    clean_df[column] = clean_df[column].str.upper()
+def clean_data(df):
+    # only keep the fields needed by the first version
+    clean_df = df[columns_to_keep].copy()
+
+    # convert date fields
+    clean_df["DifficultyDate"] = pd.to_datetime(
+        clean_df["DifficultyDate"],
+        format="%m/%d/%Y",
+        errors="coerce",
+    )
+
+    clean_df["SubmissionDate"] = pd.to_datetime(
+        clean_df["SubmissionDate"],
+        errors="coerce",
+        utc=True,
+    )
+
+    # clean up categorical/text fields
+    for column in text_columns:
+        clean_df[column] = clean_df[column].str.strip()
+        clean_df[column] = clean_df[column].replace("", pd.NA)
+
+    for column in uppercase_columns:
+        clean_df[column] = clean_df[column].str.upper()
+
+    # keep the original wording of the maintenance description
+    clean_df["Discrepancy"] = clean_df["Discrepancy"].str.strip()
+
+    # make sure cleaning did not remove reports
+    if len(clean_df) != len(df):
+        raise ValueError("Row count changed during cleaning")
+
+    # control number should still identify one report
+    if clean_df["OperatorControlNumber"].duplicated().any():
+        raise ValueError("Duplicate OperatorControlNumber found after cleaning")
+
+    return clean_df
 
 
-# only remove extra spaces from the beginning and end of discrepancy text
-# don't change capitalization or wording because we may use this for ml later
-clean_df["Discrepancy"] = clean_df["Discrepancy"].str.strip()
+def main():
+    # load the original faa dataset
+    df = pd.read_csv(
+        raw_file,
+        dtype={"JASCCode": "string"},
+        low_memory=False,
+    )
+
+    clean_df = clean_data(df)
+
+    print("\n=== CLEANING SUMMARY ===")
+    print("Raw shape:", df.shape)
+    print("Cleaned shape:", clean_df.shape)
+
+    print("\nMissing aircraft makes:")
+    print(clean_df["AircraftMake"].isna().sum())
+
+    print("\nMissing aircraft models:")
+    print(clean_df["AircraftModel"].isna().sum())
+
+    print("\nDuplicate control numbers:")
+    print(clean_df["OperatorControlNumber"].duplicated().sum())
+
+    print("\nInvalid difficulty dates:")
+    print(clean_df["DifficultyDate"].isna().sum())
+
+    print("\nInvalid submission dates:")
+    print(clean_df["SubmissionDate"].isna().sum())
+
+    print("\nEmpty discrepancy descriptions:")
+    print(clean_df["Discrepancy"].str.strip().eq("").sum())
+
+    # save the processed dataset
+    clean_df.to_csv(
+        output_file,
+        index=False,
+    )
+
+    print("\nCleaned dataset saved to:")
+    print(output_file)
 
 
-# basic checks before saving the cleaned dataset
-print("\n=== CLEANING SUMMARY ===")
-print("Raw shape:", df.shape)
-print("Cleaned shape:", clean_df.shape)
-
-print("\nMissing aircraft makes:")
-print(clean_df["AircraftMake"].isna().sum())
-
-print("\nMissing aircraft models:")
-print(clean_df["AircraftModel"].isna().sum())
-
-print("\nDuplicate control numbers:")
-print(clean_df["OperatorControlNumber"].duplicated().sum())
-
-print("\nInvalid difficulty dates:")
-print(clean_df["DifficultyDate"].isna().sum())
-
-print("\nInvalid submission dates:")
-print(clean_df["SubmissionDate"].isna().sum())
-
-print("\nEmpty discrepancy descriptions:")
-print(clean_df["Discrepancy"].str.strip().eq("").sum())
-
-
-# make sure cleaning did not accidentally remove any reports
-if len(clean_df) != len(df):
-    raise ValueError("Row count changed during cleaning")
-
-
-# make sure the report identifier is still unique
-if clean_df["OperatorControlNumber"].duplicated().any():
-    raise ValueError("Duplicate OperatorControlNumber found after cleaning")
-
-
-# save the processed dataset
-clean_df.to_csv(
-    output_file,
-    index=False,
-)
-
-print("\nCleaned dataset saved to:")
-print(output_file)
+if __name__ == "__main__":
+    main()
