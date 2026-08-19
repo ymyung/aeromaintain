@@ -1,6 +1,5 @@
 import pandas as pd
 
-
 # load the raw faa dataset
 df = pd.read_csv(
     "data/raw/SDR-2025.csv",
