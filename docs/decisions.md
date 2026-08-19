@@ -101,3 +101,62 @@ Allow pandas to automatically infer JASC codes as numbers.
 
 ### Tradeoff
 Any numerical operations would require conversion later, but I do not currently expect numerical calculations on the codes themselves.
+
+## 2026-08-18 - use OperatorControlNumber as the report identifier
+
+### Decision
+Use `OperatorControlNumber` as the main identifier for maintenance reports in the cleaned dataset.
+
+### Reason
+Validation showed that all 67,620 records have an OperatorControlNumber and there are no duplicate values in the 2025 dataset.
+
+### Alternative considered
+Create a new generated ID for every report.
+
+### Tradeoff
+The FAA identifier is useful for tracing cleaned records back to the source data, although I may still use a database-generated ID later if it makes database design easier.
+
+
+## 2026-08-18 - do not remove rows with missing aircraft make or model
+
+### Decision
+Keep reports that are missing `AircraftMake` or `AircraftModel`.
+
+### Reason
+Only 84 records are missing aircraft make and 88 are missing aircraft model. The reports still contain other useful information such as JASC code, part information, and discrepancy text.
+
+### Alternative considered
+Drop any record that does not have both aircraft make and aircraft model.
+
+### Tradeoff
+Some dashboard filters will need to handle missing aircraft information, but useful maintenance reports will not be unnecessarily removed.
+
+
+## 2026-08-18 - convert DifficultyDate during cleaning
+
+### Decision
+Convert `DifficultyDate` into a proper date type in the cleaned dataset.
+
+### Reason
+All 67,620 dates were successfully parsed using the expected month/day/year format and the date range matches the 2025 dataset.
+
+### Alternative considered
+Keep the dates as strings.
+
+### Tradeoff
+Converting the field means the cleaning pipeline needs to enforce a specific date format, but it will make filtering and time-based analysis much easier.
+
+
+## 2026-08-18 - keep discrepancy text for machine learning and analysis
+
+### Decision
+Keep the full `Discrepancy` text in the cleaned dataset.
+
+### Reason
+Every report contains a non-empty discrepancy description. The median description is 203 characters long, so the field contains enough text to be useful for search, analysis, and possible machine learning.
+
+### Alternative considered
+Only keep structured fields such as JASC code and part name.
+
+### Tradeoff
+Keeping free text increases storage and requires additional preprocessing for machine learning, but it preserves one of the most informative fields in the dataset.
