@@ -282,3 +282,91 @@ Continue checking the cleaning results manually after every change.
 
 ### Tradeoff
 Tests require some additional code to maintain, but they should make later changes safer and easier to debug.
+
+## 2026-08-19 - use SQLite for the MVP
+
+### Decision
+Use SQLite as the database for the first version of AeroMaintain.
+
+### Reason
+The first version is a small application that does not require a separate database server or many simultaneous users. SQLite still lets me work with a relational database and SQL without adding unnecessary setup.
+
+### Alternative considered
+Use PostgreSQL from the beginning.
+
+### Tradeoff
+SQLite has fewer features for larger multi-user applications, so the project may need to move to PostgreSQL if the application grows.
+
+
+## 2026-08-19 - build the database from processed data
+
+### Decision
+Generate the SQLite database from the processed dataset instead of manually creating or editing database records.
+
+### Reason
+The database should be reproducible from the same cleaning pipeline used to generate the processed data.
+
+### Alternative considered
+Create the database once and treat the database file as the main copy of the cleaned data.
+
+### Tradeoff
+Rebuilding the database takes some additional time, but the database can always be recreated from the original source and cleaning code.
+
+
+## 2026-08-19 - define the database schema explicitly
+
+### Decision
+Create the `maintenance_reports` table using an explicit SQL schema instead of letting pandas automatically decide the database structure.
+
+### Reason
+Defining the schema myself makes the expected fields, data types, primary key, and required values clear.
+
+### Alternative considered
+Use `pandas.DataFrame.to_sql()` to automatically create the table.
+
+### Tradeoff
+The explicit SQL requires more code, but it gives more control over the structure of the database and provides more direct experience working with SQL.
+
+## 2026-08-20 - index common dashboard query fields
+
+### Decision
+Add database indexes for aircraft make/model, difficulty date, JASC code, and part name.
+
+### Reason
+These are likely to be some of the most common fields used for filtering and grouping in the AeroMaintain dashboard. Indexing them should make those queries easier for SQLite to execute as the dataset grows.
+
+### Alternative considered
+Leave the database without additional indexes until performance becomes a noticeable problem.
+
+### Tradeoff
+Indexes use additional storage and slightly increase the cost of inserting data, but the database is rebuilt in batches and will be read much more often than it is written.
+
+
+## 2026-08-20 - create indexes after bulk loading the reports
+
+### Decision
+Create the database indexes after inserting the maintenance reports.
+
+### Reason
+The database is rebuilt from the processed dataset in one batch. Creating the indexes after the rows are loaded avoids maintaining each index during every individual insert.
+
+### Alternative considered
+Create all indexes before inserting the data.
+
+### Tradeoff
+The indexes are unavailable during the short database build process, but this does not matter because the database is not queried until the build is finished.
+
+
+## 2026-08-20 - use in-memory SQLite databases for unit tests
+
+### Decision
+Use SQLite's in-memory database mode for database unit tests.
+
+### Reason
+The tests only need to verify schema behaviour, inserts, constraints, and indexes. Using an in-memory database keeps the tests fast and prevents them from modifying the real AeroMaintain database.
+
+### Alternative considered
+Create a temporary database file for every test run.
+
+### Tradeoff
+The unit tests do not test behaviour involving the actual database file on disk, so the full database build is still checked separately.

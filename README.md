@@ -16,6 +16,9 @@ Completed so far:
 - built an initial cleaning pipeline
 - preserved the original raw dataset separately from processed data
 - added automated tests for the cleaning pipeline
+- built a SQLite database containing the processed maintenance reports
+- added database constraints and indexes for common aircraft, date, JASC, and part queries
+- added automated tests for the cleaning and database layers
 
 ## Dataset
 
