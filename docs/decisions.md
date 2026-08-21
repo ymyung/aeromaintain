@@ -370,3 +370,47 @@ Create a temporary database file for every test run.
 
 ### Tradeoff
 The unit tests do not test behaviour involving the actual database file on disk, so the full database build is still checked separately.
+
+## 2026-08-21 - keep analytics separate from the user interface
+
+### Decision
+Create a separate analytics module for database queries instead of putting SQL directly inside the dashboard.
+
+### Reason
+I want the database logic to be reusable and testable without depending on Streamlit. This should also keep the user interface code simpler when the dashboard is added.
+
+### Alternative considered
+Write SQL queries directly inside the Streamlit application.
+
+### Tradeoff
+The project has an extra module, but the responsibilities of the database and user interface are more clearly separated.
+
+
+## 2026-08-21 - perform report aggregations in SQL
+
+### Decision
+Use SQL for operations such as counting reports by aircraft, part, and month instead of loading the entire database into pandas first.
+
+### Reason
+The database is already designed for filtering and grouping records, so it makes sense to return only the smaller result that the application needs.
+
+### Alternative considered
+Load all maintenance reports into pandas and perform all grouping there.
+
+### Tradeoff
+Some analysis will now require writing SQL, but less unnecessary data needs to be loaded into memory.
+
+
+## 2026-08-21 - parameterize query filters
+
+### Decision
+Use SQL parameters for values such as aircraft make, aircraft model, and query limits.
+
+### Reason
+The dashboard will eventually supply these values based on user selections. Parameterized queries keep user-provided values separate from the SQL statement and avoid manually building SQL strings.
+
+### Alternative considered
+Create SQL statements using Python string formatting.
+
+### Tradeoff
+Parameterized queries require passing the values separately, but they are safer and easier to reason about.
