@@ -3,18 +3,22 @@ import sqlite3
 import pandas as pd
 
 from src.analytics import (
+    get_aircraft_summary,
+    get_jasc_codes_for_aircraft,
     get_models_for_make,
     get_reports_by_month,
+    get_reports_by_month_for_aircraft,
     get_top_aircraft_makes,
     get_top_parts,
     get_top_parts_for_aircraft,
     get_total_reports,
+    search_aircraft_reports,
 )
 from src.database import create_reports_table, load_reports
 
 
 def make_test_data():
-    # small dataset for testing analytics queries
+    # small known dataset so the expected query results are easy to check
     return pd.DataFrame(
         [
             {
@@ -122,7 +126,7 @@ def make_test_data():
 
 
 def make_database():
-    # use a temporary in-memory database
+    # in-memory databases disappear when the connection is closed
     connection = sqlite3.connect(":memory:")
 
     create_reports_table(connection)
@@ -150,18 +154,64 @@ def test_top_aircraft_makes():
 
     assert result.iloc[0]["aircraft_make"] == "BOEING"
     assert result.iloc[0]["report_count"] == 3
-    assert "AIRBUS" in result["aircraft_make"].values
+    assert result.iloc[1]["aircraft_make"] == "AIRBUS"
+    assert result.iloc[1]["report_count"] == 1
+
+
+def test_top_aircraft_makes_excludes_missing_values():
+    connection = make_database()
+
+    result = get_top_aircraft_makes(connection)
+
+    connection.close()
+
+    assert result["aircraft_make"].isna().sum() == 0
+
+
+def test_top_aircraft_makes_limit():
+    connection = make_database()
+
+    result = get_top_aircraft_makes(
+        connection,
+        limit=1,
+    )
+
+    connection.close()
+
+    assert len(result) == 1
+    assert result.iloc[0]["aircraft_make"] == "BOEING"
 
 
 def test_models_for_make():
     connection = make_database()
 
-    result = get_models_for_make(connection, "BOEING")
+    result = get_models_for_make(
+        connection,
+        "BOEING",
+    )
 
     connection.close()
 
+    assert len(result) == 2
     assert result.iloc[0]["aircraft_model"] == "7378H4"
     assert result.iloc[0]["report_count"] == 2
+    assert result.iloc[1]["aircraft_model"] == "737823"
+    assert result.iloc[1]["report_count"] == 1
+
+
+def test_models_for_make_only_returns_selected_make():
+    connection = make_database()
+
+    result = get_models_for_make(
+        connection,
+        "AIRBUS",
+    )
+
+    connection.close()
+
+    assert len(result) == 1
+    assert result.iloc[0]["aircraft_model"] == "A320232"
+    assert result.iloc[0]["report_count"] == 1
 
 
 def test_top_parts():
@@ -171,8 +221,13 @@ def test_top_parts():
 
     connection.close()
 
-    assert result.iloc[0]["part_name"] in {"HINGE", "VALVE"}
     assert result.iloc[0]["report_count"] == 2
+    assert result.iloc[1]["report_count"] == 2
+
+    returned_parts = set(result["part_name"])
+
+    assert "HINGE" in returned_parts
+    assert "VALVE" in returned_parts
 
 
 def test_top_parts_for_specific_aircraft():
@@ -198,6 +253,8 @@ def test_reports_by_month():
 
     connection.close()
 
+    assert len(result) == 3
+
     january = result[result["month"] == "2025-01"].iloc[0]
     february = result[result["month"] == "2025-02"].iloc[0]
     march = result[result["month"] == "2025-03"].iloc[0]
@@ -205,3 +262,195 @@ def test_reports_by_month():
     assert january["report_count"] == 2
     assert february["report_count"] == 2
     assert march["report_count"] == 1
+
+
+def test_aircraft_summary():
+    connection = make_database()
+
+    result = get_aircraft_summary(
+        connection,
+        "BOEING",
+        "7378H4",
+    )
+
+    connection.close()
+
+    summary = result.iloc[0]
+
+    assert summary["report_count"] == 2
+    assert summary["unique_parts"] == 1
+    assert summary["unique_jasc_codes"] == 1
+    assert summary["first_report_date"] == "2025-01-10"
+    assert summary["latest_report_date"] == "2025-01-20"
+
+
+def test_reports_by_month_for_aircraft():
+    connection = make_database()
+
+    result = get_reports_by_month_for_aircraft(
+        connection,
+        "BOEING",
+        "7378H4",
+    )
+
+    connection.close()
+
+    assert len(result) == 1
+    assert result.iloc[0]["month"] == "2025-01"
+    assert result.iloc[0]["report_count"] == 2
+
+
+def test_jasc_codes_for_aircraft():
+    connection = make_database()
+
+    result = get_jasc_codes_for_aircraft(
+        connection,
+        "BOEING",
+        "7378H4",
+    )
+
+    connection.close()
+
+    assert len(result) == 1
+    assert result.iloc[0]["jasc_code"] == "5320"
+    assert result.iloc[0]["report_count"] == 2
+
+
+def test_search_aircraft_reports_without_filters():
+    connection = make_database()
+
+    result = search_aircraft_reports(
+        connection,
+        "BOEING",
+        "7378H4",
+    )
+
+    connection.close()
+
+    assert len(result) == 2
+
+
+def test_search_aircraft_reports_by_text():
+    connection = make_database()
+
+    result = search_aircraft_reports(
+        connection,
+        "BOEING",
+        "7378H4",
+        search_text="damaged",
+    )
+
+    connection.close()
+
+    assert len(result) == 1
+    assert "damaged" in result.iloc[0]["discrepancy"].lower()
+
+
+def test_search_aircraft_reports_text_is_case_insensitive():
+    connection = make_database()
+
+    result = search_aircraft_reports(
+        connection,
+        "BOEING",
+        "7378H4",
+        search_text="DAMAGED",
+    )
+
+    connection.close()
+
+    assert len(result) == 1
+    assert "damaged" in result.iloc[0]["discrepancy"].lower()
+
+
+def test_search_aircraft_reports_by_jasc():
+    connection = make_database()
+
+    result = search_aircraft_reports(
+        connection,
+        "BOEING",
+        "7378H4",
+        jasc_code="5320",
+    )
+
+    connection.close()
+
+    assert len(result) == 2
+    assert (result["jasc_code"] == "5320").all()
+
+
+def test_search_aircraft_reports_with_both_filters():
+    connection = make_database()
+
+    result = search_aircraft_reports(
+        connection,
+        "BOEING",
+        "7378H4",
+        search_text="wear",
+        jasc_code="5320",
+    )
+
+    connection.close()
+
+    assert len(result) == 1
+    assert result.iloc[0]["jasc_code"] == "5320"
+    assert "wear" in result.iloc[0]["discrepancy"].lower()
+
+
+def test_search_aircraft_reports_with_no_matches():
+    connection = make_database()
+
+    result = search_aircraft_reports(
+        connection,
+        "BOEING",
+        "7378H4",
+        search_text="this should not exist",
+    )
+
+    connection.close()
+
+    assert result.empty
+
+
+def test_search_aircraft_reports_wrong_jasc_returns_no_matches():
+    connection = make_database()
+
+    result = search_aircraft_reports(
+        connection,
+        "BOEING",
+        "7378H4",
+        jasc_code="9999",
+    )
+
+    connection.close()
+
+    assert result.empty
+
+
+def test_search_aircraft_reports_limit():
+    connection = make_database()
+
+    result = search_aircraft_reports(
+        connection,
+        "BOEING",
+        "7378H4",
+        limit=1,
+    )
+
+    connection.close()
+
+    assert len(result) == 1
+
+
+def test_search_aircraft_reports_returns_newest_first():
+    connection = make_database()
+
+    result = search_aircraft_reports(
+        connection,
+        "BOEING",
+        "7378H4",
+    )
+
+    connection.close()
+
+    assert result.iloc[0]["difficulty_date"] == "2025-01-20"
+    assert result.iloc[1]["difficulty_date"] == "2025-01-10"
