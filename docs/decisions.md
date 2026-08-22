@@ -414,3 +414,149 @@ Create SQL statements using Python string formatting.
 
 ### Tradeoff
 Parameterized queries require passing the values separately, but they are safer and easier to reason about.
+
+## 2026-08-21 - use Streamlit for the first user interface
+
+### Decision
+Use Streamlit for the initial AeroMaintain dashboard.
+
+### Reason
+The main goal of the first version is to make the maintenance analytics interactive and usable without spending a large amount of time building a separate frontend. Streamlit works directly with Python and pandas, which are already used throughout the project.
+
+### Alternative considered
+Build a React frontend with a separate backend API.
+
+### Tradeoff
+Streamlit gives less control over the interface than a dedicated frontend framework, but it allows me to build and deploy a working application much faster.
+
+
+## 2026-08-21 - keep database queries outside the Streamlit app
+
+### Decision
+Have the Streamlit application call functions from `analytics.py` instead of writing SQL directly inside `app.py`.
+
+### Reason
+The analytics queries are already tested separately and keeping them outside the interface makes the UI code easier to understand.
+
+### Alternative considered
+Write each SQL query directly inside the Streamlit page where it is used.
+
+### Tradeoff
+The application has another layer to follow, but database logic can be reused and tested without running the dashboard.
+
+
+## 2026-08-21 - build functionality before visual polish
+
+### Decision
+Make the first dashboard focus on working filters, analytics, and charts before spending time on styling.
+
+### Reason
+The main value of the project comes from the data pipeline and useful analysis. I want to make sure the product works before spending time changing its appearance.
+
+### Alternative considered
+Design a polished interface before connecting all of the analytics.
+
+### Tradeoff
+The first dashboard will look basic, but interface work will be based on functionality that is already working.
+
+## 2026-08-21 - expose individual maintenance reports in the dashboard
+
+### Decision
+Allow users to view individual maintenance reports for the selected aircraft instead of only showing aggregated counts.
+
+### Reason
+Summary charts show which parts appear frequently, but the original discrepancy descriptions provide more context about what was actually reported and what maintenance was performed.
+
+### Alternative considered
+Keep the dashboard limited to aggregated charts and statistics.
+
+### Tradeoff
+Displaying individual reports adds more information to the interface and may require search or pagination later, but it makes the underlying maintenance data much easier to explore.
+
+## 2026-08-21 - prioritize selected-aircraft analytics
+
+### Decision
+Make the main dashboard focus on the aircraft make and model selected by the user instead of showing mostly overall dataset statistics.
+
+### Reason
+The main purpose of AeroMaintain is to let users investigate maintenance reports for a specific aircraft. Model-specific report counts, parts, trends, and descriptions are more useful than only showing global statistics.
+
+### Alternative considered
+Keep the dashboard focused mainly on overall FAA dataset summaries.
+
+### Tradeoff
+Some overall dataset information becomes less prominent, but the dashboard becomes more useful for actually exploring an aircraft.
+
+
+## 2026-08-21 - add summary metrics before more charts
+
+### Decision
+Show report count, number of unique reported parts, and number of JASC codes for the selected aircraft.
+
+### Reason
+These values give the user quick context before they look at the detailed charts and maintenance reports.
+
+### Alternative considered
+Add additional charts without a summary section.
+
+### Tradeoff
+The summary metrics take some interface space, but they make the dashboard easier to understand at a glance.
+
+
+## 2026-08-21 - show monthly trends for the selected aircraft
+
+### Decision
+Use the monthly trend chart to show reports for the selected aircraft rather than only the overall dataset.
+
+### Reason
+A model-specific trend is more relevant to the aircraft exploration workflow and changes when the user selects a different model.
+
+### Alternative considered
+Keep the monthly chart as an overall 2025 dataset trend.
+
+### Tradeoff
+Some aircraft models have fewer reports and may produce less visually interesting charts, but the chart is more directly related to the user's selection.
+
+## 2026-08-21 - add search to maintenance reports
+
+### Decision
+Allow users to search the discrepancy text for maintenance reports belonging to the selected aircraft.
+
+### Reason
+The report descriptions contain much more detail than the summary charts. Searching for terms such as cracks, corrosion, sensors, or landing gear makes the underlying maintenance data easier to investigate.
+
+### Alternative considered
+Only display the most recent maintenance reports without search.
+
+### Tradeoff
+Basic text search does not understand synonyms or meaning, but it is simple, fast, and useful for the first version.
+
+
+## 2026-08-21 - allow JASC filtering within an aircraft model
+
+### Decision
+Add an optional JASC code filter to the maintenance report browser.
+
+### Reason
+JASC codes provide a structured way to narrow the reports to particular aircraft systems or components and complement the free-text search.
+
+### Alternative considered
+Only provide free-text search.
+
+### Tradeoff
+Users currently need to understand the numeric JASC codes, so the interface will eventually need readable JASC descriptions.
+
+
+## 2026-08-21 - build SQL filters based on optional user input
+
+### Decision
+Construct the report query so optional search and JASC conditions are only added when the user selects them.
+
+### Reason
+A single query function can support unfiltered reports, text searches, JASC filtering, or both without duplicating several nearly identical SQL queries.
+
+### Alternative considered
+Create separate functions for each combination of filters.
+
+### Tradeoff
+The query-building logic is slightly more complex, but it avoids duplicated code.
