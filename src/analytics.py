@@ -3,9 +3,22 @@ from pathlib import Path
 
 import pandas as pd
 
-database_file = Path(
-    "data/aeromaintain.db"
-)
+database_file = Path("data/aeromaintain.db")
+
+
+def get_dataset_summary(connection):
+    query = """
+        SELECT
+            COUNT(*) AS report_count,
+            COUNT(DISTINCT aircraft_make) AS make_count,
+            COUNT(DISTINCT aircraft_model) AS model_count
+        FROM maintenance_reports
+    """
+
+    return pd.read_sql_query(
+        query,
+        connection,
+    )
 
 
 def get_total_reports(connection):
@@ -124,11 +137,7 @@ def get_top_parts_for_aircraft(
 def get_reports_by_month(connection):
     query = """
         SELECT
-            substr(
-                difficulty_date,
-                1,
-                7
-            ) AS month,
+            substr(difficulty_date, 1, 7) AS month,
             COUNT(*) AS report_count
         FROM maintenance_reports
         GROUP BY month
@@ -149,18 +158,10 @@ def get_aircraft_summary(
     query = """
         SELECT
             COUNT(*) AS report_count,
-            COUNT(
-                DISTINCT part_name
-            ) AS unique_parts,
-            COUNT(
-                DISTINCT jasc_code
-            ) AS unique_jasc_codes,
-            MIN(
-                difficulty_date
-            ) AS first_report_date,
-            MAX(
-                difficulty_date
-            ) AS latest_report_date
+            COUNT(DISTINCT part_name) AS unique_parts,
+            COUNT(DISTINCT jasc_code) AS unique_jasc_codes,
+            MIN(difficulty_date) AS first_report_date,
+            MAX(difficulty_date) AS latest_report_date
         FROM maintenance_reports
         WHERE aircraft_make = ?
           AND aircraft_model = ?
@@ -183,11 +184,7 @@ def get_reports_by_month_for_aircraft(
 ):
     query = """
         SELECT
-            substr(
-                difficulty_date,
-                1,
-                7
-            ) AS month,
+            substr(difficulty_date, 1, 7) AS month,
             COUNT(*) AS report_count
         FROM maintenance_reports
         WHERE aircraft_make = ?
@@ -231,11 +228,7 @@ def get_reports_for_aircraft(
         LEFT JOIN jasc_codes AS j
             ON r.jasc_code = j.jasc_code
         LEFT JOIN jasc_categories AS c
-            ON substr(
-                r.jasc_code,
-                1,
-                2
-            ) = c.category_code
+            ON substr(r.jasc_code, 1, 2) = c.category_code
         WHERE r.aircraft_make = ?
           AND r.aircraft_model = ?
         ORDER BY r.difficulty_date DESC
@@ -274,11 +267,7 @@ def get_jasc_codes_for_aircraft(
         LEFT JOIN jasc_codes AS j
             ON r.jasc_code = j.jasc_code
         LEFT JOIN jasc_categories AS c
-            ON substr(
-                r.jasc_code,
-                1,
-                2
-            ) = c.category_code
+            ON substr(r.jasc_code, 1, 2) = c.category_code
         WHERE r.aircraft_make = ?
           AND r.aircraft_model = ?
         GROUP BY
@@ -327,11 +316,7 @@ def search_aircraft_reports(
         LEFT JOIN jasc_codes AS j
             ON r.jasc_code = j.jasc_code
         LEFT JOIN jasc_categories AS c
-            ON substr(
-                r.jasc_code,
-                1,
-                2
-            ) = c.category_code
+            ON substr(r.jasc_code, 1, 2) = c.category_code
         WHERE r.aircraft_make = ?
           AND r.aircraft_model = ?
     """
@@ -374,13 +359,11 @@ def search_aircraft_reports(
 
 
 def main():
-    with sqlite3.connect(
-        database_file
-    ) as connection:
-        print("Total reports")
+    with sqlite3.connect(database_file) as connection:
+        print("Dataset summary")
         print(
-            get_total_reports(
-                connection
+            get_dataset_summary(
+                connection,
             )
         )
 
@@ -388,7 +371,7 @@ def main():
         print("Top aircraft makes")
         print(
             get_top_aircraft_makes(
-                connection
+                connection,
             )
         )
 
@@ -405,7 +388,7 @@ def main():
         print("Top parts")
         print(
             get_top_parts(
-                connection
+                connection,
             )
         )
 
@@ -413,7 +396,7 @@ def main():
         print("Reports by month")
         print(
             get_reports_by_month(
-                connection
+                connection,
             )
         )
 
