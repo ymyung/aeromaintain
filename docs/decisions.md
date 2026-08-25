@@ -560,3 +560,75 @@ Create separate functions for each combination of filters.
 
 ### Tradeoff
 The query-building logic is slightly more complex, but it avoids duplicated code.
+
+## 2026-08-22 - test optional report filters independently
+
+### Decision
+Add automated tests for text search, JASC filtering, combined filters, and searches with no results.
+
+### Reason
+The maintenance report query changes depending on user input, so each possible filter combination should be checked against known test data.
+
+### Alternative considered
+Only verify the filters manually through the Streamlit interface.
+
+### Tradeoff
+The additional tests take some time to maintain, but they make it much easier to detect errors in the query-building logic.
+
+## 2026-08-22 - separate JASC categories from JASC codes
+
+### Decision
+Store four-digit JASC codes and two-digit JASC categories in separate reference files.
+
+### Reason
+A category such as FUSELAGE applies to many individual JASC codes. Storing the category once avoids repeating the same information across many rows and provides one place to maintain each category name.
+
+### Alternative considered
+Store the category name directly on every JASC code row.
+
+### Tradeoff
+The category must be looked up when it is needed, but the reference data contains less duplication and keeps category information in one authoritative place.
+
+## 2026-08-24 - use the quick-reference section as the authoritative JASC code list
+
+### Decision
+Use PDF page indexes 7 through 12 as the source for JASC category codes, JASC codes, and code titles.
+
+### Reason
+These pages contain the compact reference table where categories and four-digit JASC codes follow a consistent structure that can be parsed reliably.
+
+### Alternative considered
+Scan every page of the JASC PDF for four-digit codes.
+
+### Tradeoff
+The extraction depends on the current layout of the FAA PDF, but restricting parsing to the known quick-reference section avoids accidentally treating codes in the detailed definitions section as duplicate records.
+
+
+## 2026-08-24 - extract JASC descriptions separately from code titles
+
+### Decision
+Extract JASC code titles from the quick-reference section and detailed descriptions from the later definition section, then combine them using the JASC code.
+
+### Reason
+The PDF stores concise titles and detailed definitions in different sections. Parsing them separately allows each section to be handled according to its own structure.
+
+### Alternative considered
+Try to extract code names and descriptions in a single parsing pass.
+
+### Tradeoff
+The extractor has multiple stages, but the parsing logic is easier to understand and validate.
+
+
+## 2026-08-24 - validate JASC reference coverage against the SDR dataset
+
+### Decision
+Compare the extracted JASC reference codes against the codes actually used in the cleaned 2025 SDR dataset.
+
+### Reason
+A parser can run successfully while still missing valid reference records. Checking coverage against the dataset provides an additional validation that the generated reference data is useful for AeroMaintain.
+
+### Alternative considered
+Assume the extraction is correct if all parsed codes follow the expected four-digit format.
+
+### Tradeoff
+The validation depends on the processed SDR dataset being available, but it can reveal extraction gaps that format checks alone would not catch.
