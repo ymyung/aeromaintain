@@ -14,12 +14,18 @@ from src.analytics import (
     get_top_parts_for_aircraft,
     search_aircraft_reports,
 )
+from src.database import build_database
 
 st.set_page_config(
     page_title="AeroMaintain",
     page_icon="✈️",
     layout="wide",
 )
+
+
+if not database_file.exists():
+    with st.spinner("Preparing the maintenance report database..."):
+        build_database()
 
 
 # stop the page from becoming extremely wide on large monitors
@@ -111,7 +117,7 @@ with sqlite3.connect(database_file) as connection:
 
     st.altair_chart(
         manufacturer_chart,
-        use_container_width=True,
+        width="stretch",
     )
 
     st.caption(
@@ -225,7 +231,7 @@ with sqlite3.connect(database_file) as connection:
 
         st.altair_chart(
             parts_chart,
-            use_container_width=True,
+            width="stretch",
         )
 
     with chart_column_2:
@@ -272,7 +278,7 @@ with sqlite3.connect(database_file) as connection:
 
         st.altair_chart(
             monthly_chart,
-            use_container_width=True,
+            width="stretch",
         )
 
     st.divider()
@@ -310,7 +316,7 @@ with sqlite3.connect(database_file) as connection:
             ),
         },
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         height=300,
     )
 
@@ -389,7 +395,7 @@ with sqlite3.connect(database_file) as connection:
             "discrepancy": "Maintenance Report",
         },
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         height=450,
     )
 

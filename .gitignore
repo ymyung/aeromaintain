@@ -7,6 +7,7 @@ __pycache__/
 
 data/raw/*.csv
 data/processed/*.csv
+!data/processed/sdr_2025_clean.csv
 data/reference/source/*.pdf
 
 data/*.db
