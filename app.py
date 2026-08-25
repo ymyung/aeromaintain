@@ -1,17 +1,17 @@
 import sqlite3
 
+import altair as alt
 import streamlit as st
 
 from src.analytics import (
     database_file,
     get_aircraft_summary,
+    get_dataset_summary,
     get_jasc_codes_for_aircraft,
     get_models_for_make,
     get_reports_by_month_for_aircraft,
     get_top_aircraft_makes,
-    get_top_parts,
     get_top_parts_for_aircraft,
-    get_total_reports,
     search_aircraft_reports,
 )
 
@@ -19,6 +19,22 @@ st.set_page_config(
     page_title="AeroMaintain",
     page_icon="✈️",
     layout="wide",
+)
+
+
+# stop the page from becoming extremely wide on large monitors
+st.markdown(
+    """
+    <style>
+        .block-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding-top: 2rem;
+            padding-bottom: 3rem;
+        }
+    </style>
+    """,
+    unsafe_allow_html=True,
 )
 
 
@@ -30,47 +46,87 @@ st.write(
 )
 
 
-with sqlite3.connect(
-    database_file
-) as connection:
-    # overall dataset information
-    total_reports = get_total_reports(
-        connection
+with sqlite3.connect(database_file) as connection:
+    # dataset overview
+    dataset_summary = get_dataset_summary(
+        connection,
     )
 
+    summary = dataset_summary.iloc[0]
+
+    metric_1, metric_2, metric_3 = st.columns(3)
+
+    metric_1.metric(
+        "Maintenance Reports",
+        f"{int(summary['report_count']):,}",
+    )
+
+    metric_2.metric(
+        "Aircraft Makes",
+        f"{int(summary['make_count']):,}",
+    )
+
+    metric_3.metric(
+        "Aircraft Models",
+        f"{int(summary['model_count']):,}",
+    )
+
+    # manufacturer overview
     top_makes = get_top_aircraft_makes(
         connection,
         limit=10,
     )
 
-    top_metric_1, top_metric_2 = st.columns(2)
+    st.subheader("Top Reported Manufacturers")
 
-    top_metric_1.metric(
-        "2025 Maintenance Reports",
-        f"{total_reports:,}",
+    manufacturer_chart = (
+        alt.Chart(top_makes)
+        .mark_bar()
+        .encode(
+            x=alt.X(
+                "report_count:Q",
+                title="Reported Maintenance Issues",
+            ),
+            y=alt.Y(
+                "aircraft_make:N",
+                title=None,
+                sort="-x",
+            ),
+            tooltip=[
+                alt.Tooltip(
+                    "aircraft_make:N",
+                    title="Manufacturer",
+                ),
+                alt.Tooltip(
+                    "report_count:Q",
+                    title="Reports",
+                    format=",",
+                ),
+            ],
+        )
+        .properties(
+            height=300,
+        )
     )
 
-    top_metric_2.metric(
-        "Top Manufacturers Displayed",
-        len(top_makes),
+    st.altair_chart(
+        manufacturer_chart,
+        use_container_width=True,
     )
 
-    # manufacturer overview
-    st.subheader(
-        "Reports by Aircraft Manufacturer"
-    )
-
-    st.bar_chart(
-        top_makes,
-        x="aircraft_make",
-        y="report_count",
+    st.caption(
+        "Counts represent submitted FAA Service Difficulty Reports, "
+        "not manufacturer failure rates."
     )
 
     st.divider()
 
     # aircraft explorer
-    st.header(
-        "Aircraft Explorer"
+    st.header("Aircraft Explorer")
+
+    st.write(
+        "Select an aircraft manufacturer and model to explore "
+        "its reported maintenance issues."
     )
 
     make_column, model_column = st.columns(2)
@@ -103,23 +159,23 @@ with sqlite3.connect(
         selected_model,
     )
 
-    summary = aircraft_summary.iloc[0]
+    aircraft = aircraft_summary.iloc[0]
 
-    metric_1, metric_2, metric_3 = st.columns(3)
+    aircraft_metric_1, aircraft_metric_2, aircraft_metric_3 = st.columns(3)
 
-    metric_1.metric(
+    aircraft_metric_1.metric(
         "Reports",
-        f"{int(summary['report_count']):,}",
+        f"{int(aircraft['report_count']):,}",
     )
 
-    metric_2.metric(
+    aircraft_metric_2.metric(
         "Unique Parts Reported",
-        f"{int(summary['unique_parts']):,}",
+        f"{int(aircraft['unique_parts']):,}",
     )
 
-    metric_3.metric(
+    aircraft_metric_3.metric(
         "JASC Codes",
-        f"{int(summary['unique_jasc_codes']):,}",
+        f"{int(aircraft['unique_jasc_codes']):,}",
     )
 
     # selected aircraft charts
@@ -137,10 +193,39 @@ with sqlite3.connect(
             limit=10,
         )
 
-        st.bar_chart(
-            top_parts,
-            x="part_name",
-            y="report_count",
+        parts_chart = (
+            alt.Chart(top_parts)
+            .mark_bar()
+            .encode(
+                x=alt.X(
+                    "report_count:Q",
+                    title="Reports",
+                ),
+                y=alt.Y(
+                    "part_name:N",
+                    title=None,
+                    sort="-x",
+                ),
+                tooltip=[
+                    alt.Tooltip(
+                        "part_name:N",
+                        title="Part",
+                    ),
+                    alt.Tooltip(
+                        "report_count:Q",
+                        title="Reports",
+                        format=",",
+                    ),
+                ],
+            )
+            .properties(
+                height=330,
+            )
+        )
+
+        st.altair_chart(
+            parts_chart,
+            use_container_width=True,
         )
 
     with chart_column_2:
@@ -156,17 +241,48 @@ with sqlite3.connect(
             )
         )
 
-        st.line_chart(
-            monthly_reports,
-            x="month",
-            y="report_count",
+        monthly_chart = (
+            alt.Chart(monthly_reports)
+            .mark_line(point=True)
+            .encode(
+                x=alt.X(
+                    "month:N",
+                    title="Month",
+                ),
+                y=alt.Y(
+                    "report_count:Q",
+                    title="Reports",
+                ),
+                tooltip=[
+                    alt.Tooltip(
+                        "month:N",
+                        title="Month",
+                    ),
+                    alt.Tooltip(
+                        "report_count:Q",
+                        title="Reports",
+                        format=",",
+                    ),
+                ],
+            )
+            .properties(
+                height=330,
+            )
+        )
+
+        st.altair_chart(
+            monthly_chart,
+            use_container_width=True,
         )
 
     st.divider()
 
-    # maintenance report browser
-    st.header(
-        "Maintenance Reports"
+    # aircraft system breakdown
+    st.header("Aircraft System Breakdown")
+
+    st.caption(
+        "JASC codes identify aircraft systems and components "
+        "used in FAA maintenance reporting."
     )
 
     jasc_codes = get_jasc_codes_for_aircraft(
@@ -175,9 +291,40 @@ with sqlite3.connect(
         selected_model,
     )
 
-    filter_column_1, filter_column_2 = (
-        st.columns(2)
+    st.dataframe(
+        jasc_codes[
+            [
+                "jasc_code",
+                "code_name",
+                "category_name",
+                "report_count",
+            ]
+        ],
+        column_config={
+            "jasc_code": "JASC Code",
+            "code_name": "System / Component",
+            "category_name": "Category",
+            "report_count": st.column_config.NumberColumn(
+                "Reports",
+                format="%d",
+            ),
+        },
+        hide_index=True,
+        use_container_width=True,
+        height=300,
     )
+
+    st.divider()
+
+    # maintenance report browser
+    st.header("Maintenance Reports")
+
+    st.write(
+        "Search the original maintenance descriptions "
+        "or filter reports by JASC system."
+    )
+
+    filter_column_1, filter_column_2 = st.columns(2)
 
     with filter_column_1:
         search_text = st.text_input(
@@ -187,8 +334,8 @@ with sqlite3.connect(
             ),
         )
 
-    # create readable labels while keeping
-    # the actual JASC code as the stored value
+    # the user sees a readable label,
+    # but the database still receives the original code
     jasc_labels = {
         row["jasc_code"]: (
             f"{row['jasc_code']} — "
@@ -226,60 +373,27 @@ with sqlite3.connect(
     )
 
     st.caption(
-        f"Showing {len(aircraft_reports)} "
-        "matching reports. "
+        f"Showing {len(aircraft_reports)} matching reports. "
         "A maximum of 100 reports are displayed."
     )
 
     st.dataframe(
         aircraft_reports,
+        column_config={
+            "difficulty_date": "Date",
+            "jasc_code": "JASC Code",
+            "jasc_name": "System / Component",
+            "jasc_category": "Category",
+            "part_name": "Part",
+            "part_condition": "Condition",
+            "discrepancy": "Maintenance Report",
+        },
         hide_index=True,
         use_container_width=True,
-    )
-
-    st.divider()
-
-    # show JASC breakdown for selected aircraft
-    st.header(
-        "Aircraft System Breakdown"
-    )
-
-    st.dataframe(
-        jasc_codes[
-            [
-                "jasc_code",
-                "code_name",
-                "category_name",
-                "report_count",
-            ]
-        ],
-        hide_index=True,
-        use_container_width=True,
-    )
-
-    st.divider()
-
-    # overall dataset information
-    st.header(
-        "Overall Dataset"
-    )
-
-    st.subheader(
-        "Most Commonly Reported Parts"
-    )
-
-    overall_parts = get_top_parts(
-        connection,
-        limit=10,
-    )
-
-    st.dataframe(
-        overall_parts,
-        hide_index=True,
-        use_container_width=True,
+        height=450,
     )
 
     st.caption(
-        "Report counts represent submitted "
-        "maintenance reports, not aircraft failure rates."
+        "Report counts represent submitted maintenance reports, "
+        "not aircraft failure rates."
     )
