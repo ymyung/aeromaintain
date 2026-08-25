@@ -560,3 +560,134 @@ Create separate functions for each combination of filters.
 
 ### Tradeoff
 The query-building logic is slightly more complex, but it avoids duplicated code.
+
+## 2026-08-22 - test optional report filters independently
+
+### Decision
+Add automated tests for text search, JASC filtering, combined filters, and searches with no results.
+
+### Reason
+The maintenance report query changes depending on user input, so each possible filter combination should be checked against known test data.
+
+### Alternative considered
+Only verify the filters manually through the Streamlit interface.
+
+### Tradeoff
+The additional tests take some time to maintain, but they make it much easier to detect errors in the query-building logic.
+
+## 2026-08-22 - separate JASC categories from JASC codes
+
+### Decision
+Store four-digit JASC codes and two-digit JASC categories in separate reference files.
+
+### Reason
+A category such as FUSELAGE applies to many individual JASC codes. Storing the category once avoids repeating the same information across many rows and provides one place to maintain each category name.
+
+### Alternative considered
+Store the category name directly on every JASC code row.
+
+### Tradeoff
+The category must be looked up when it is needed, but the reference data contains less duplication and keeps category information in one authoritative place.
+
+## 2026-08-24 - use the quick-reference section as the authoritative JASC code list
+
+### Decision
+Use PDF page indexes 7 through 12 as the source for JASC category codes, JASC codes, and code titles.
+
+### Reason
+These pages contain the compact reference table where categories and four-digit JASC codes follow a consistent structure that can be parsed reliably.
+
+### Alternative considered
+Scan every page of the JASC PDF for four-digit codes.
+
+### Tradeoff
+The extraction depends on the current layout of the FAA PDF, but restricting parsing to the known quick-reference section avoids accidentally treating codes in the detailed definitions section as duplicate records.
+
+
+## 2026-08-24 - extract JASC descriptions separately from code titles
+
+### Decision
+Extract JASC code titles from the quick-reference section and detailed descriptions from the later definition section, then combine them using the JASC code.
+
+### Reason
+The PDF stores concise titles and detailed definitions in different sections. Parsing them separately allows each section to be handled according to its own structure.
+
+### Alternative considered
+Try to extract code names and descriptions in a single parsing pass.
+
+### Tradeoff
+The extractor has multiple stages, but the parsing logic is easier to understand and validate.
+
+
+## 2026-08-24 - validate JASC reference coverage against the SDR dataset
+
+### Decision
+Compare the extracted JASC reference codes against the codes actually used in the cleaned 2025 SDR dataset.
+
+### Reason
+A parser can run successfully while still missing valid reference records. Checking coverage against the dataset provides an additional validation that the generated reference data is useful for AeroMaintain.
+
+### Alternative considered
+Assume the extraction is correct if all parsed codes follow the expected four-digit format.
+
+### Tradeoff
+The validation depends on the processed SDR dataset being available, but it can reveal extraction gaps that format checks alone would not catch.
+
+## 2026-08-24 - load JASC reference data into SQLite
+
+### Decision
+Load the generated JASC category and code reference files into separate SQLite tables.
+
+### Reason
+Maintenance reports only contain four-digit JASC codes, while the reference data contains the readable names and descriptions. Storing the reference data in SQLite allows analytics queries to combine the two when needed without copying JASC descriptions into every maintenance report.
+
+### Alternative considered
+Add JASC names, categories, and descriptions directly to every maintenance report during cleaning.
+
+### Tradeoff
+Queries that need readable JASC information require joins, but the maintenance dataset stays separate from reference data and avoids repeating the same information across thousands of rows.
+
+
+## 2026-08-24 - join JASC reference data at query time
+
+### Decision
+Use SQL joins between maintenance reports and the JASC reference tables when readable JASC information is needed.
+
+### Reason
+The JASC code already acts as the link between the maintenance data and the reference data. Joining the tables keeps the stored records normalized while still allowing the application to retrieve code names and categories.
+
+### Alternative considered
+Merge the reference information into the processed SDR CSV before loading the database.
+
+### Tradeoff
+The analytics queries become slightly more complex, but the reference data can be maintained independently from the maintenance records.
+
+
+## 2026-08-24 - use left joins for JASC enrichment
+
+### Decision
+Use LEFT JOIN when adding JASC names and categories to maintenance reports.
+
+### Reason
+A maintenance report should still be returned even if its JASC code is missing from or cannot be matched to the reference tables. Reference-data problems should not cause valid maintenance reports to disappear from analytics results.
+
+### Alternative considered
+Use INNER JOIN and only return reports with matching JASC reference records.
+
+### Tradeoff
+Some results may contain an unknown JASC name or category, but no maintenance records are silently removed because of an incomplete reference lookup.
+
+
+## 2026-08-24 - separate displayed JASC labels from filter values
+
+### Decision
+Show human-readable JASC labels in the dashboard while continuing to use the original four-digit JASC code as the value passed to analytics queries.
+
+### Reason
+A label such as `5320 — FUSELAGE MISCELLANEOUS STRUCTURE` is much easier for a user to understand than `5320` alone, while the four-digit code remains the stable identifier used by the database.
+
+### Alternative considered
+Replace JASC codes throughout the application with their descriptive names.
+
+### Tradeoff
+The interface needs a small mapping between codes and display labels, but database filtering remains simple and tied to the original FAA data.

@@ -7,5 +7,6 @@ __pycache__/
 
 data/raw/*.csv
 data/processed/*.csv
+data/reference/source/*.pdf
 
 data/*.db

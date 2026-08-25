@@ -8,13 +8,20 @@ from src.analytics import (
     get_models_for_make,
     get_reports_by_month,
     get_reports_by_month_for_aircraft,
+    get_reports_for_aircraft,
     get_top_aircraft_makes,
     get_top_parts,
     get_top_parts_for_aircraft,
     get_total_reports,
     search_aircraft_reports,
 )
-from src.database import create_reports_table, load_reports
+from src.database import (
+    create_jasc_tables,
+    create_reports_table,
+    load_jasc_categories,
+    load_jasc_codes,
+    load_reports,
+)
 
 
 def make_test_data():
@@ -125,12 +132,57 @@ def make_test_data():
     )
 
 
+def make_jasc_categories():
+    return pd.DataFrame(
+        [
+            {
+                "category_code": "33",
+                "category_name": "LIGHTS",
+            },
+            {
+                "category_code": "52",
+                "category_name": "DOORS",
+            },
+            {
+                "category_code": "53",
+                "category_name": "FUSELAGE",
+            },
+        ]
+    )
+
+
+def make_jasc_codes():
+    return pd.DataFrame(
+        [
+            {
+                "jasc_code": "3350",
+                "code_name": "EMERGENCY LIGHTING",
+                "code_desc": "Emergency lighting system reports.",
+            },
+            {
+                "jasc_code": "5210",
+                "code_name": "PASSENGER/CREW DOORS",
+                "code_desc": "Passenger and crew door reports.",
+            },
+            {
+                "jasc_code": "5320",
+                "code_name": "FUSELAGE MISCELLANEOUS STRUCTURE",
+                "code_desc": "Fuselage miscellaneous structure reports.",
+            },
+        ]
+    )
+
+
 def make_database():
     # in-memory databases disappear when the connection is closed
     connection = sqlite3.connect(":memory:")
 
     create_reports_table(connection)
     load_reports(connection, make_test_data())
+
+    create_jasc_tables(connection)
+    load_jasc_categories(connection, make_jasc_categories())
+    load_jasc_codes(connection, make_jasc_codes())
 
     return connection
 
@@ -230,6 +282,19 @@ def test_top_parts():
     assert "VALVE" in returned_parts
 
 
+def test_top_parts_limit():
+    connection = make_database()
+
+    result = get_top_parts(
+        connection,
+        limit=1,
+    )
+
+    connection.close()
+
+    assert len(result) == 1
+
+
 def test_top_parts_for_specific_aircraft():
     connection = make_database()
 
@@ -244,6 +309,20 @@ def test_top_parts_for_specific_aircraft():
     assert len(result) == 1
     assert result.iloc[0]["part_name"] == "HINGE"
     assert result.iloc[0]["report_count"] == 2
+
+
+def test_top_parts_for_wrong_aircraft_is_empty():
+    connection = make_database()
+
+    result = get_top_parts_for_aircraft(
+        connection,
+        "BOEING",
+        "DOES_NOT_EXIST",
+    )
+
+    connection.close()
+
+    assert result.empty
 
 
 def test_reports_by_month():
@@ -262,6 +341,11 @@ def test_reports_by_month():
     assert january["report_count"] == 2
     assert february["report_count"] == 2
     assert march["report_count"] == 1
+    assert result["month"].tolist() == [
+        "2025-01",
+        "2025-02",
+        "2025-03",
+    ]
 
 
 def test_aircraft_summary():
@@ -300,6 +384,44 @@ def test_reports_by_month_for_aircraft():
     assert result.iloc[0]["report_count"] == 2
 
 
+def test_reports_for_aircraft_are_enriched_and_newest_first():
+    connection = make_database()
+
+    result = get_reports_for_aircraft(
+        connection,
+        "BOEING",
+        "7378H4",
+    )
+
+    connection.close()
+
+    assert len(result) == 2
+    assert result["difficulty_date"].tolist() == [
+        "2025-01-20",
+        "2025-01-10",
+    ]
+    assert (
+        result.iloc[0]["jasc_name"]
+        == "FUSELAGE MISCELLANEOUS STRUCTURE"
+    )
+    assert result.iloc[0]["jasc_category"] == "FUSELAGE"
+
+
+def test_reports_for_aircraft_limit():
+    connection = make_database()
+
+    result = get_reports_for_aircraft(
+        connection,
+        "BOEING",
+        "7378H4",
+        limit=1,
+    )
+
+    connection.close()
+
+    assert len(result) == 1
+
+
 def test_jasc_codes_for_aircraft():
     connection = make_database()
 
@@ -313,6 +435,11 @@ def test_jasc_codes_for_aircraft():
 
     assert len(result) == 1
     assert result.iloc[0]["jasc_code"] == "5320"
+    assert (
+        result.iloc[0]["code_name"]
+        == "FUSELAGE MISCELLANEOUS STRUCTURE"
+    )
+    assert result.iloc[0]["category_name"] == "FUSELAGE"
     assert result.iloc[0]["report_count"] == 2
 
 
@@ -328,6 +455,11 @@ def test_search_aircraft_reports_without_filters():
     connection.close()
 
     assert len(result) == 2
+    assert (
+        result.iloc[0]["jasc_name"]
+        == "FUSELAGE MISCELLANEOUS STRUCTURE"
+    )
+    assert result.iloc[0]["jasc_category"] == "FUSELAGE"
 
 
 def test_search_aircraft_reports_by_text():
@@ -344,6 +476,11 @@ def test_search_aircraft_reports_by_text():
 
     assert len(result) == 1
     assert "damaged" in result.iloc[0]["discrepancy"].lower()
+    assert (
+        result.iloc[0]["jasc_name"]
+        == "FUSELAGE MISCELLANEOUS STRUCTURE"
+    )
+    assert result.iloc[0]["jasc_category"] == "FUSELAGE"
 
 
 def test_search_aircraft_reports_text_is_case_insensitive():
@@ -376,6 +513,11 @@ def test_search_aircraft_reports_by_jasc():
 
     assert len(result) == 2
     assert (result["jasc_code"] == "5320").all()
+    assert (
+        result["jasc_name"]
+        == "FUSELAGE MISCELLANEOUS STRUCTURE"
+    ).all()
+    assert (result["jasc_category"] == "FUSELAGE").all()
 
 
 def test_search_aircraft_reports_with_both_filters():
@@ -394,6 +536,11 @@ def test_search_aircraft_reports_with_both_filters():
     assert len(result) == 1
     assert result.iloc[0]["jasc_code"] == "5320"
     assert "wear" in result.iloc[0]["discrepancy"].lower()
+    assert (
+        result.iloc[0]["jasc_name"]
+        == "FUSELAGE MISCELLANEOUS STRUCTURE"
+    )
+    assert result.iloc[0]["jasc_category"] == "FUSELAGE"
 
 
 def test_search_aircraft_reports_with_no_matches():
