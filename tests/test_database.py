@@ -3,7 +3,14 @@ import sqlite3
 import pandas as pd
 import pytest
 
-from src.database import create_indexes, create_reports_table, load_reports
+from src.database import (
+    create_indexes,
+    create_jasc_tables,
+    create_reports_table,
+    load_jasc_categories,
+    load_jasc_codes,
+    load_reports,
+)
 
 
 def make_test_data():
@@ -49,6 +56,29 @@ def make_test_data():
                 "stage_of_operation_code": "IN",
                 "how_discovered_code": "O",
                 "discrepancy": "Landing gear unsafe indication.",
+            },
+        ]
+    )
+
+
+def make_jasc_categories():
+    return pd.DataFrame(
+        [
+            {
+                "category_code": "53",
+                "category_name": "FUSELAGE",
+            },
+        ]
+    )
+
+
+def make_jasc_codes():
+    return pd.DataFrame(
+        [
+            {
+                "jasc_code": "5320",
+                "code_name": "FUSELAGE MISCELLANEOUS STRUCTURE",
+                "code_desc": "Fuselage miscellaneous structure reports.",
             },
         ]
     )
@@ -141,3 +171,64 @@ def test_indexes_are_created():
     assert "idx_reports_date" in index_names
     assert "idx_reports_jasc" in index_names
     assert "idx_reports_part" in index_names
+
+
+def test_jasc_reference_tables_are_created():
+    connection = make_database()
+
+    create_jasc_tables(connection)
+
+    tables = connection.execute(
+        """
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'table'
+          AND name IN (
+              'jasc_codes',
+              'jasc_categories'
+          )
+        """
+    ).fetchall()
+
+    connection.close()
+
+    table_names = {table[0] for table in tables}
+
+    assert table_names == {
+        "jasc_codes",
+        "jasc_categories",
+    }
+
+
+def test_jasc_reference_records_are_loaded():
+    connection = make_database()
+
+    create_jasc_tables(connection)
+    load_jasc_categories(connection, make_jasc_categories())
+    load_jasc_codes(connection, make_jasc_codes())
+
+    code = connection.execute(
+        """
+        SELECT code_name, code_desc
+        FROM jasc_codes
+        WHERE jasc_code = ?
+        """,
+        ("5320",),
+    ).fetchone()
+
+    category = connection.execute(
+        """
+        SELECT category_name
+        FROM jasc_categories
+        WHERE category_code = ?
+        """,
+        ("53",),
+    ).fetchone()
+
+    connection.close()
+
+    assert code == (
+        "FUSELAGE MISCELLANEOUS STRUCTURE",
+        "Fuselage miscellaneous structure reports.",
+    )
+    assert category == ("FUSELAGE",)

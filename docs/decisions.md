@@ -632,3 +632,62 @@ Assume the extraction is correct if all parsed codes follow the expected four-di
 
 ### Tradeoff
 The validation depends on the processed SDR dataset being available, but it can reveal extraction gaps that format checks alone would not catch.
+
+## 2026-08-24 - load JASC reference data into SQLite
+
+### Decision
+Load the generated JASC category and code reference files into separate SQLite tables.
+
+### Reason
+Maintenance reports only contain four-digit JASC codes, while the reference data contains the readable names and descriptions. Storing the reference data in SQLite allows analytics queries to combine the two when needed without copying JASC descriptions into every maintenance report.
+
+### Alternative considered
+Add JASC names, categories, and descriptions directly to every maintenance report during cleaning.
+
+### Tradeoff
+Queries that need readable JASC information require joins, but the maintenance dataset stays separate from reference data and avoids repeating the same information across thousands of rows.
+
+
+## 2026-08-24 - join JASC reference data at query time
+
+### Decision
+Use SQL joins between maintenance reports and the JASC reference tables when readable JASC information is needed.
+
+### Reason
+The JASC code already acts as the link between the maintenance data and the reference data. Joining the tables keeps the stored records normalized while still allowing the application to retrieve code names and categories.
+
+### Alternative considered
+Merge the reference information into the processed SDR CSV before loading the database.
+
+### Tradeoff
+The analytics queries become slightly more complex, but the reference data can be maintained independently from the maintenance records.
+
+
+## 2026-08-24 - use left joins for JASC enrichment
+
+### Decision
+Use LEFT JOIN when adding JASC names and categories to maintenance reports.
+
+### Reason
+A maintenance report should still be returned even if its JASC code is missing from or cannot be matched to the reference tables. Reference-data problems should not cause valid maintenance reports to disappear from analytics results.
+
+### Alternative considered
+Use INNER JOIN and only return reports with matching JASC reference records.
+
+### Tradeoff
+Some results may contain an unknown JASC name or category, but no maintenance records are silently removed because of an incomplete reference lookup.
+
+
+## 2026-08-24 - separate displayed JASC labels from filter values
+
+### Decision
+Show human-readable JASC labels in the dashboard while continuing to use the original four-digit JASC code as the value passed to analytics queries.
+
+### Reason
+A label such as `5320 — FUSELAGE MISCELLANEOUS STRUCTURE` is much easier for a user to understand than `5320` alone, while the four-digit code remains the stable identifier used by the database.
+
+### Alternative considered
+Replace JASC codes throughout the application with their descriptive names.
+
+### Tradeoff
+The interface needs a small mapping between codes and display labels, but database filtering remains simple and tied to the original FAA data.

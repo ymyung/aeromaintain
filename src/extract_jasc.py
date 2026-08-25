@@ -12,10 +12,6 @@ clean_file = Path("data/processed/sdr_2025_clean.csv")
 # indexes 7 through 12 contain the compact JASC reference table
 quick_reference_pages = range(7, 13)
 
-# detailed definitions begin at index 13
-definition_pages = range(13, 73)
-
-
 category_pattern = re.compile(r"^(\d{2})\s+(.+)$")
 code_pattern = re.compile(r"^(\d{4})\s+(.+)$")
 definition_category_pattern = re.compile(r"^(\d{2})\s*-\s*(.+)$")
@@ -77,7 +73,8 @@ def extract_descriptions(reader, valid_codes):
         if description:
             descriptions[current_code] = description
 
-    for page_number in definition_pages:
+    # detailed definitions begin after the quick-reference section
+    for page_number in range(13, len(reader.pages)):
         text = reader.pages[page_number].extract_text()
 
         if not text:
@@ -86,7 +83,6 @@ def extract_descriptions(reader, valid_codes):
         for line in text.splitlines():
             cleaned_line = line.strip()
 
-            # ignore repeated document headings
             if cleaned_line in {
                 "SYSTEM CODES - TITLE",
                 "DEFINITIONS",
@@ -94,7 +90,7 @@ def extract_descriptions(reader, valid_codes):
             }:
                 continue
 
-            # category headings separate groups of detailed definitions
+            # category headings such as "11 - Placards and Markings"
             if definition_category_pattern.match(cleaned_line):
                 save_description()
 
@@ -105,7 +101,7 @@ def extract_descriptions(reader, valid_codes):
 
             code_match = code_pattern.match(cleaned_line)
 
-            # only accept codes already found in the quick-reference table
+            # only use codes already found in the quick-reference table
             if code_match and code_match.group(1) in valid_codes:
                 save_description()
 
@@ -117,7 +113,7 @@ def extract_descriptions(reader, valid_codes):
             if current_code and cleaned_line:
                 description_lines.append(cleaned_line)
 
-    # save the final description in the document
+    # save the final definition
     save_description()
 
     return descriptions
@@ -131,7 +127,7 @@ def build_reference_data():
     categories_df = pd.DataFrame(categories)
     codes_df = pd.DataFrame(codes)
 
-    # remove any accidental duplicate records
+    # remove accidental duplicates
     categories_df = categories_df.drop_duplicates(
         subset="category_code",
     )
@@ -140,13 +136,13 @@ def build_reference_data():
         subset="jasc_code",
     )
 
-    # sort so the generated files are predictable and easy to inspect
+    # predictable ordering
     categories_df = categories_df.sort_values(
-        "category_code",
+        "category_code"
     ).reset_index(drop=True)
 
     codes_df = codes_df.sort_values(
-        "jasc_code",
+        "jasc_code"
     ).reset_index(drop=True)
 
     valid_codes = set(codes_df["jasc_code"])
@@ -156,42 +152,50 @@ def build_reference_data():
         valid_codes,
     )
 
-    # add detailed descriptions to the quick-reference code table
-    codes_df["code_desc"] = codes_df["jasc_code"].map(descriptions).fillna("")
+    codes_df["code_desc"] = (
+        codes_df["jasc_code"]
+        .map(descriptions)
+        .fillna("")
+    )
 
     return categories_df, codes_df
 
 
 def validate_reference_data(categories_df, codes_df):
-    # category codes should always contain exactly 2 digits
-    valid_categories = categories_df["category_code"].str.fullmatch(r"\d{2}")
+    valid_categories = categories_df["category_code"].str.fullmatch(
+        r"\d{2}"
+    )
 
     if not valid_categories.all():
         raise ValueError("Invalid JASC category code found")
 
-    # JASC codes should always contain exactly 4 digits
-    valid_codes = codes_df["jasc_code"].str.fullmatch(r"\d{4}")
+    valid_codes = codes_df["jasc_code"].str.fullmatch(
+        r"\d{4}"
+    )
 
     if not valid_codes.all():
         raise ValueError("Invalid JASC code found")
 
-    # codes and categories should each be unique
     if categories_df["category_code"].duplicated().any():
         raise ValueError("Duplicate JASC category found")
 
     if codes_df["jasc_code"].duplicated().any():
         raise ValueError("Duplicate JASC code found")
 
-    # every code should belong to a known category
     known_categories = set(categories_df["category_code"])
 
-    code_categories = codes_df["jasc_code"].str[:2]
+    code_categories = set(
+        codes_df["jasc_code"].str[:2]
+    )
 
-    missing_categories = sorted(set(code_categories) - known_categories)
+    missing_categories = sorted(
+        code_categories - known_categories
+    )
 
     if missing_categories:
         raise ValueError(
-            f"JASC codes reference missing categories: {missing_categories}"
+            "JASC codes reference missing categories: "
+            f"{missing_categories}"
         )
 
 
@@ -200,7 +204,6 @@ def validate_sdr_coverage(codes_df):
         print()
         print("Clean SDR dataset not found.")
         print("Skipping SDR JASC coverage check.")
-
         return
 
     reports = pd.read_csv(
@@ -209,24 +212,36 @@ def validate_sdr_coverage(codes_df):
         usecols=["JASCCode"],
     )
 
-    dataset_codes = set(reports["JASCCode"].dropna().str.strip())
+    dataset_codes = set(
+        reports["JASCCode"]
+        .dropna()
+        .str.strip()
+    )
 
     reference_codes = set(codes_df["jasc_code"])
 
-    missing_codes = sorted(dataset_codes - reference_codes)
+    missing_codes = sorted(
+        dataset_codes - reference_codes
+    )
 
     print()
-    print(f"JASC codes used by SDR dataset: {len(dataset_codes)}")
     print(
-        f"Dataset codes found in reference: {len(dataset_codes) - len(missing_codes)}"
+        f"JASC codes used by SDR dataset: "
+        f"{len(dataset_codes)}"
+    )
+
+    print(
+        "Dataset codes found in reference: "
+        f"{len(dataset_codes) - len(missing_codes)}"
     )
 
     if missing_codes:
         print("Dataset codes missing from reference:")
-
         print(missing_codes)
     else:
-        print("All SDR JASC codes exist in the reference table.")
+        print(
+            "All SDR JASC codes exist in the reference table."
+        )
 
 
 def main():
@@ -252,13 +267,20 @@ def main():
         index=False,
     )
 
+    descriptions_found = (
+        codes_df["code_desc"]
+        .str.strip()
+        .ne("")
+        .sum()
+    )
+
     print("JASC reference extraction complete.")
     print(f"Categories: {len(categories_df)}")
     print(f"Codes: {len(codes_df)}")
-
-    descriptions_found = codes_df["code_desc"].str.strip().ne("").sum()
-
-    print(f"Codes with descriptions: {descriptions_found}")
+    print(
+        f"Codes with descriptions: "
+        f"{descriptions_found}"
+    )
 
     print()
     print(f"Saved: {categories_file}")
